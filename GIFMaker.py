@@ -7,7 +7,7 @@ from datetime import datetime
 from time import sleep
 import pyautogui
 
-from GifMaker.RecordHelpers import RecordHelpers
+from RecordHelpers import RecordHelpers
 
 class AreaSeleccion(tk.Toplevel):
     def __init__(self, master, callback, event):

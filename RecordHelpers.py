@@ -1,38 +1,31 @@
-import time
+from datetime import datetime
 import pyautogui
 import os
 from moviepy.editor import VideoFileClip
 
 class RecordHelpers:
     isRecordingDisplay = False
-    
-    def grabar_pantalla_a_gif(output_path, duration, fps):
+        
+    def grabar_pantalla_a_gif(output_path, area=None):
         screenshot_list = []
-        num_frames = int(duration * fps)
-
-        for _ in range(num_frames):
-            screenshot = pyautogui.screenshot()
-            screenshot_list.append(screenshot)
-
-        screenshot_list[0].save(output_path, save_all=True, append_images=screenshot_list[1:], duration=10, loop=0)
-        
-    def iniciar_grabar_pantalla_a_gif_area():
-        RecordHelpers.isRecordingDisplay = True
-        
-    def detener_grabar_pantalla_a_gif_area():
-        RecordHelpers.isRecordingDisplay = False
-        
-    def grabar_pantalla_a_gif_area(output_path, area=None):
-        screenshot_list = []
-        duration = 10
         fps = 30
+        
+        regionToCapture = None
+        if (area != None ):
+            regionToCapture = (int(area[0]), int(area[1]), int(area[2] - area[0]), int(area[3] - area[1]))
 
+        startDateTime: datetime = datetime.now()
+        
         while(RecordHelpers.isRecordingDisplay):
-            screenshot = pyautogui.screenshot(region=(int(area[0]), int(area[1]), int(area[2] - area[0]), int(area[3] - area[1])))
+            screenshot = pyautogui.screenshot(region=regionToCapture)
             screenshot_list.append(screenshot)
 
-        screenshot_list[0].save(output_path, save_all=True, append_images=screenshot_list[1:], duration=duration / fps, loop=0)
+        endDateTime: datetime = datetime.now()
         
+        duration = (endDateTime - startDateTime).total_seconds()
+        
+        screenshot_list[0].save(output_path, save_all=True, append_images=screenshot_list[1:], duration=duration / fps, loop=0)
+            
     def convertir_video_a_gif(self, video_path, gif_path, duracion_segundos, fps, inicio_segundos):
             if video_path.lower().endswith(('.mov', '.mov')):
                 nuevo_video_path = video_path[:-4] + "_converted.mp4"

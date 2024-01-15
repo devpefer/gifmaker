@@ -2,70 +2,11 @@ import threading
 import tkinter as tk
 from tkinter import ttk
 from tkinter import filedialog
-from PIL import Image, ImageTk
 from datetime import datetime
-from time import sleep
-import pyautogui
-
+from AreaSelection import AreaSelection
 from RecordHelpers import RecordHelpers
 
-class AreaSeleccion(tk.Toplevel):
-    def __init__(self, master, callback, event):
-        tk.Toplevel.__init__(self, master)
-        self.inicializar()
-        self.callback = callback
-        self.event = event
-
-    def inicializar(self):
-        self.attributes("-alpha", 0.5)
-        self.overrideredirect(True)
-        self.geometry(f'{self.winfo_screenwidth()}x{self.winfo_screenheight()}')
-
-        screenshot = pyautogui.screenshot()
-        screenshot = screenshot.resize((self.winfo_screenwidth(), self.winfo_screenheight()), Image.BICUBIC)
-        self.screenshot_img = ImageTk.PhotoImage(screenshot)
-
-        self.canvas = tk.Canvas(self, width=self.winfo_screenwidth(), height=self.winfo_screenheight(), cursor="cross")
-        self.canvas.create_image(0, 0, anchor=tk.NW, image=self.screenshot_img)
-        self.canvas.pack()
-
-        self.start_x = None
-        self.start_y = None
-
-        self.bind("<ButtonPress-1>", self.on_press)
-        self.bind("<B1-Motion>", self.on_drag)
-        self.bind("<ButtonRelease-1>", self.on_release)
-
-    def on_press(self, event):
-        self.start_x = event.x_root
-        self.start_y = event.y_root
-
-    def on_drag(self, event):
-        cur_x = event.x_root
-        cur_y = event.y_root
-
-        self.canvas.delete("rect")
-
-        self.canvas.create_rectangle(
-            self.start_x - self.winfo_rootx(),
-            self.start_y - self.winfo_rooty(),
-            cur_x - self.winfo_rootx(),
-            cur_y - self.winfo_rooty(),
-            outline="red",
-            width=2,
-            tags="rect"
-        )
-
-    def on_release(self, event):
-        cur_x = event.x_root
-        cur_y = event.y_root
-        self.destroy()
-        sleep(0.5)
-
-        self.callback(self.start_x, self.start_y, cur_x, cur_y)
-        self.event.set()
-
-class ConvertidorGIF:
+class GIFMaker:
     def __init__(self, master):
         self.master = master
         master.title("GIF Maker")
@@ -86,6 +27,9 @@ class ConvertidorGIF:
 
         self.button_select_area = tk.Button(self.tab1, text="Seleccionar Área", command=self.seleccionar_area)
         self.button_select_area.pack()
+        
+        self.button_deselect_area = tk.Button(self.tab1, text="Deseleccionar Área", command=self.deseleccionar_area)
+        self.button_deselect_area.pack()
 
         self.tab2 = tk.Frame(self.notebook)
         self.notebook.add(self.tab2, text="Video")
@@ -126,8 +70,8 @@ class ConvertidorGIF:
         self.button_convertir = tk.Button(self.tab2, text="Convertir a GIF", command=self.convertir_a_gif)
         self.button_convertir.pack()
 
-        self.recording = False
-        self.start_time = None
+        self.video_path = None
+        self.gif_path = None
         self.area_selected = None
 
         self.notebook.pack(expand=1, fill="both")
@@ -158,33 +102,25 @@ class ConvertidorGIF:
             self.label_info.config(text=f"Error: {str(e)}")
 
     def iniciar_grabacion(self):
-        if not self.recording:
-            self.recording = True
-            self.start_time = datetime.now()
+        if not RecordHelpers.isRecordingDisplay:
+            RecordHelpers.isRecordingDisplay = True
             self.button_screen_record.config(text="Grabación en curso", state=tk.DISABLED)
             self.button_stop_record.config(state=tk.NORMAL)
             self.button_select_area.config(state=tk.DISABLED)
-
-            area_seleccionada = AreaSeleccion(self.master, self.guardar_area_seleccionada, self.area_selected_event)
-            area_seleccionada.wait_window()
+            self.button_deselect_area.config(state=tk.DISABLED)
 
             RecordHelpers.isRecordingDisplay = True
-            threading.Thread(target=RecordHelpers.grabar_pantalla_a_gif_area, args=(self.gif_path, self.area_selected),).start()
+            threading.Thread(target=RecordHelpers.grabar_pantalla_a_gif, args=(self.gif_path, self.area_selected),).start()
         else:
             self.label_info.config(text="Ya se está grabando. Detén la grabación actual antes de iniciar una nueva.")
 
-    def iniciar_grabacion_thread(self):
-        area_seleccionada = AreaSeleccion(self.master, self.guardar_area_seleccionada, self.area_selected_event)
-        self.area_selected_event.wait()
-        RecordHelpers.isRecordingDisplay = True
-        threading.Thread(target=RecordHelpers.grabar_pantalla_a_gif_area, args=(self.gif_path, self.area_selected),).start()
-
     def detener_grabacion(self):
-        if self.recording:
-            self.recording = False
+        if RecordHelpers.isRecordingDisplay:
+            RecordHelpers.isRecordingDisplay = False
             self.button_screen_record.config(text="Iniciar Grabación", state=tk.NORMAL)
             self.button_stop_record.config(state=tk.DISABLED)
             self.button_select_area.config(state=tk.NORMAL)
+            self.button_deselect_area.config(state=tk.NORMAL)
 
             RecordHelpers.isRecordingDisplay = False
             self.label_info.config(text="La grabación de pantalla se ha creado con éxito.")
@@ -192,24 +128,19 @@ class ConvertidorGIF:
             self.label_info.config(text="No hay grabación en curso para detener.")
         
     def seleccionar_area(self):
-        self.area_selected = None
         self.label_info.config(text="Selecciona un área en la pantalla.")
-        area_seleccionada = AreaSeleccion(self.master, self.guardar_area_seleccionada, self.area_selected_event)
+        area_seleccionada = AreaSelection(self.master, self.guardar_area_seleccionada, self.area_selected_event)
         area_seleccionada.wait_window()
-
-    def seleccionar_area_thread(self):
-        area_seleccionada = AreaSeleccion(self.master, self.guardar_area_seleccionada, self.area_selected_event)
-        self.area_selected_event.wait()
+        
+    def deseleccionar_area(self):
+        self.area_selected = None
 
     def guardar_area_seleccionada(self, x1, y1, x2, y2):
         self.area_selected = (x1, y1, x2, y2)
         self.label_info.config(text=f"Área seleccionada: {self.area_selected}")
         self.area_selected_event.set()
 
-    def cargar_elementos(self):
-        pass
-
 if __name__ == "__main__":
     root = tk.Tk()
-    app = ConvertidorGIF(root)
+    app = GIFMaker(root)
     root.mainloop()
